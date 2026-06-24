@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Clinic Management System 2026</title>
+    
+    <!-- PWA Manifest via Data URI -->
+    <link rel="manifest" id="manifest-placeholder">
+    
+    <!-- Tailwind CSS (Modern UI Framework) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Chart.js (Untuk Grafik Dashboard) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        /* Glassmorphism & Custom CSS */
+        :root {
+            --primary: #0ea5e9;
+            --glass-bg: rgba(255, 255, 255, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.4);
+        }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f0fdfa; }
+        
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+        
+        /* Layout Responsif */
+        #sidebar { transition: transform 0.3s ease; }
+        #bottom-nav { display: none; }
+        
+        @media (max-width: 768px) {
+            #sidebar { transform: translateX(-100%); position: fixed; z-index: 50; }
+            #sidebar.open { transform: translateX(0); }
+            #bottom-nav { display: flex; z-index: 40; }
+            #main-content { margin-left: 0 !important; margin-bottom: 70px; }
+            .desktop-only { display: none; }
+        }
+        
+        .nav-item.active { background: #e0f2fe; color: var(--primary); border-right: 4px solid var(--primary); }
+        .bottom-nav-item.active { color: var(--primary); font-weight: bold; }
+        
+        /* Utilities */
+        .hidden { display: none !important; }
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* Table Styling */
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f8fafc; padding: 12px; text-align: left; font-size: 0.85rem; color: #64748b; text-transform: uppercase; }
+        td { padding: 12px; border-top: 1px solid #e2e8f0; font-size: 0.9rem; }
+        tr:hover { background: #f1f5f9; }
+        
+        /* Print Styles (Khusus Untuk Cetak Kwitansi) */
+        @media print {
+            body * { visibility: hidden; }
+            #print-area, #print-area * { visibility: visible; }
+            #print-area { position: absolute; left: 0; top: 0; width: 100%; padding: 20px; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased h-screen flex overflow-hidden">
+
+    <!-- LOGIN SCREEN -->
+    <div id="login-screen" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center fade-in">
+        <div class="glass-panel w-full max-w-md p-8 rounded-2xl mx-4 bg-white/90">
+            <div class="text-center mb-8">
+                <i class="ph ph-heartbeats text-5xl text-sky-500 mb-2"></i>
+                <h1 class="text-2xl font-bold text-slate-800">Klinik Sehatku</h1>
+                <p class="text-sm text-slate-500">Management System</p>
+            </div>
+            
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Username / ID</label>
+                    <input type="text" id="login-username" class="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none" required value="admin">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Password</label>
+                    <input type="password" id="login-password" class="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none" required value="admin123">
+                </div>
+                <div class="flex items-center">
+                    <input type="checkbox" id="login-is-admin" class="mr-2 rounded text-sky-500" checked>
+                    <label for="login-is-admin" class="text-sm text-slate-600">Login sebagai Super Admin (Auth)</label>
+                </div>
+                <button type="submit" class="w-full bg-sky-500 text-white font-bold py-2.5 rounded-lg hover:bg-sky-600 transition shadow-lg shadow-sky-500/30">
+                    Masuk
+                </button>
+                <div id="login-error" class="text-red-500 text-sm text-center hidden bg-red-50 p-2 rounded">Kredensial tidak valid.</div>
+            </form>
+            <div class="mt-4 text-xs text-center text-slate-500 border-t pt-4">
+                <b>Akses Cepat (Data Otomatis):</b><br>
+                Admin: admin / admin123<br>
+                Dokter: dr_andi / doc123<br>
+                Kasir: kasir1 / kasir123
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP LAYOUT -->
+    <aside id="sidebar" class="glass-panel bg-white/80 w-64 h-full flex flex-col fixed md:relative z-50">
+        <div class="p-5 flex items-center justify-between border-b border-slate-200/50">
+            <div class="flex items-center gap-2 font-bold text-lg text-sky-600">
+                <i class="ph ph-heartbeats text-2xl"></i> Klinik Sehatku
+            </div>
+            <button id="close-sidebar" class="md:hidden text-slate-500 text-2xl"><i class="ph ph-x"></i></button>
+        </div>
+        <div class="flex-1 overflow-y-auto py-4" id="nav-container"></div>
+        <div class="p-4 border-t border-slate-200/50">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-full bg-sky-100 flex items-center justify-center text-sky-600 font-bold" id="user-avatar">A</div>
+                <div>
+                    <div class="font-bold text-sm" id="user-name-display">Admin</div>
+                    <div class="text-xs text-slate-500" id="user-role-display">Super Admin</div>
+                </div>
+            </div>
+            <button id="btn-logout" class="w-full py-2 text-sm text-red-500 bg-red-50 hover:bg-red-100 rounded-lg font-medium transition flex items-center justify-center gap-2">
+                <i class="ph ph-sign-out"></i> Logout
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main id="main-content" class="flex-1 h-full flex flex-col md:ml-0 overflow-hidden relative bg-transparent">
+        <header id="main-header" class="glass-panel bg-white/60 h-16 flex items-center justify-between px-4 md:px-8 z-30">
+            <button id="open-sidebar" class="md:hidden text-slate-600 text-2xl"><i class="ph ph-list"></i></button>
+            <h2 class="text-xl font-bold text-slate-800 hidden md:block" id="header-title">Dashboard</h2>
+            <div class="flex items-center gap-4">
+                <div class="relative hidden sm:block">
+                    <i class="ph ph-magnifying-glass absolute left-3 top-2.5 text-slate-400"></i>
+                    <input type="text" placeholder="Cari Pasien..." class="pl-9 pr-4 py-1.5 bg-white border border-slate-300 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 w-64 shadow-sm">
+                </div>
+                <button class="relative p-2 text-slate-600 hover:bg-slate-100 rounded-full transition" onclick="app.navigate('notifications')">
+                    <i class="ph ph-bell text-xl"></i>
+                    <span id="notif-badge" class="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full hidden"></span>
+                </button>
+            </div>
+        </header>
+
+        <div id="content-area" class="flex-1 overflow-y-auto p-4 md:p-8 relative">
+            <div id="loading-spinner" class="absolute inset-0 bg-white/80 backdrop-blur-sm z-40 flex flex-col items-center justify-center hidden">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-4 border-sky-500"></div>
+                <p class="mt-4 text-sky-700 font-medium">Memproses data...</p>
+            </div>
+
+            <!-- Modul 1: Dashboard -->
+            <div id="view-dashboard" class="module-view space-y-6">
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-4" id="dashboard-cards-container">
+                    <div class="glass-panel p-5 rounded-xl border-l-4 border-l-blue-500">
+                        <p class="text-sm text-slate-500 font-medium">Pasien Hari Ini</p>
+                        <h3 class="text-3xl font-bold mt-1" id="dash-pasien">0</h3>
+                    </div>
+                    <div class="glass-panel p-5 rounded-xl border-l-4 border-l-orange-500">
+                        <p class="text-sm text-slate-500 font-medium">Antrean Menunggu</p>
+                        <h3 class="text-3xl font-bold mt-1" id="dash-antrean">0</h3>
+                    </div>
+                    <div class="glass-panel p-5 rounded-xl border-l-4 border-l-yellow-500">
+                        <p class="text-sm text-slate-500 font-medium">Menunggu Konfirmasi</p>
+                        <h3 class="text-3xl font-bold mt-1" id="dash-pending-apt">0</h3>
+                    </div>
+                    <div class="glass-panel p-5 rounded-xl border-l-4 border-l-emerald-500 admin-only-card">
+                        <p class="text-sm text-slate-500 font-medium">Pendapatan (Harian)</p>
+                        <h3 class="text-2xl font-bold mt-1 text-emerald-600" id="dash-pendapatan">Rp 0</h3>
+                    </div>
+                    <div class="glass-panel p-5 rounded-xl border-l-4 border-l-teal-500 admin-only-card">
+                        <p class="text-sm text-slate-500 font-medium">Pendapatan (Bulan Ini)</p>
+                        <h3 class="text-2xl font-bold mt-1 text-teal-600" id="dash-pendapatan-bulan">Rp 0</h3>
+                    </div>
+                    <div class="glass-panel p-5 rounded-xl border-l-4 border-l-purple-500">
+                        <p class="text-sm text-slate-500 font-medium">Dokter Aktif</p>
+                        <h3 class="text-3xl font-bold mt-1" id="dash-dokter">0</h3>
+                    </div>
+                </div>
+                
+                <div class="grid md:grid-cols-3 gap-6">
+                    <div class="glass-panel rounded-xl p-5 col-span-2">
+                        <h3 class="font-bold mb-4 flex items-center gap-2"><i class="ph ph-chart-line-up text-sky-500"></i> Tren Kunjungan Pasien (7 Hari Terakhir)</h3>
+                        <div class="w-full h-64"><canvas id="dashboard-chart"></canvas></div>
+                    </div>
+                    <div class="glass-panel rounded-xl p-5">
+                        <h3 class="font-bold mb-4 flex items-center gap-2"><i class="ph ph-warning-circle text-red-500"></i> Alert Apotek & Sistem</h3>
+                        <ul id="list-dash-alerts" class="space-y-3 max-h-64 overflow-y-auto"></ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modul 2: Patient -->
+            <div id="view-patients" class="module-view hidden space-y-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-xl font-bold">Data Pasien</h3>
+                    <button onclick="ui.showModal('modal-patient')" class="bg-sky-500 text-white px-4 py-2 rounded-lg text-sm font-bold shadow hover:bg-sky-600"><i class="ph ph-plus"></i> Pasien Baru</button>
+                </div>
+                <div class="glass-panel bg-white/90 rounded-xl overflow-hidden shadow-sm">
+                    <table class="w-full" id="table-patients">
+                        <thead><tr><th>No RM</th><th>Nama Lengkap</th><th>Kontak</th><th>Gol. Darah</th><th>Aksi</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Modul 3 & 4: Appointments -->
+            <div id="view-appointments" class="module-view hidden space-y-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-xl font-bold">Jadwal & Appointment</h3>
+                    <button onclick="ui.showModal('modal-appointment')" class="bg-sky-500 text-white px-4 py-2 rounded-lg text-sm font-bold shadow hover:bg-sky-600"><i class="ph ph-plus"></i> Buat Janji</button>
+                </div>
+                <div class="glass-panel bg-white/90 rounded-xl overflow-hidden shadow-sm">
+                    <table class="w-full" id="table-appointments">
+                        <thead><tr><th>Tanggal</th><th>Pasien</th><th>Dokter</th><th>Status</th><th>Aksi</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Modul 5: Queue -->
+            <div id="view-queue" class="module-view hidden space-y-6">
+                <div class="flex justify-end mb-2" id="queue-tv-btn-container">
+                    <button onclick="app.modules.queue.toggleTvMode()" class="text-slate-600 hover:text-sky-600 flex items-center gap-2 text-sm bg-white px-4 py-2 rounded-lg border shadow-sm font-bold transition">
+                        <i class="ph ph-monitor-play text-xl"></i> Mode Monitor TV
+                    </button>
+                </div>
+                <div id="queue-display-container" class="glass-panel p-8 rounded-xl text-center bg-sky-50/80 border-sky-200 transition-all duration-300">
+                    <h2 class="text-2xl font-bold text-sky-800" id="queue-display-title">Antrean Saat Ini</h2>
+                    <div class="text-6xl font-black text-sky-600 my-4 transition-all duration-300" id="current-queue-number">--</div>
+                    <p class="text-slate-600 text-lg" id="current-queue-patient">Belum ada panggilan</p>
+                    <button id="exit-tv-mode" onclick="app.modules.queue.toggleTvMode()" class="hidden mt-12 px-6 py-2 bg-slate-800 text-white rounded-full font-bold shadow-lg hover:bg-slate-700 transition mx-auto">Tutup Mode TV</button>
+                </div>
+                <div class="flex gap-4 justify-center" id="queue-action-buttons">
+                    <button onclick="app.modules.queue.callNext()" class="bg-emerald-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-emerald-500/30 hover:bg-emerald-600 text-lg flex items-center gap-2 transition">
+                        <i class="ph ph-megaphone text-2xl"></i> Panggil Selanjutnya
+                    </button>
+                </div>
+                <div class="glass-panel bg-white/90 rounded-xl overflow-hidden mt-6 shadow-sm" id="queue-table-container">
+                    <table class="w-full" id="table-queue">
+                        <thead><tr><th>No Antrean</th><th>Pasien</th><th>Poli/Dokter</th><th>Status</th><th>Aksi</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Modul 6: EMR -->
+            <div id="view-emr" class="module-view hidden space-y-4">
+                <div class="flex justify-between items-center"><h3 class="text-xl font-bold">Rekam Medis & SOAP</h3></div>
+                <div class="grid md:grid-cols-3 gap-6">
+                    <div class="glass-panel bg-white/90 rounded-xl p-4 col-span-1 border-t-4 border-sky-500 shadow-sm">
+                        <h4 class="font-bold mb-3 border-b pb-2">Antrean (Hari Ini)</h4>
+                        <ul id="list-emr-queue" class="space-y-2 max-h-96 overflow-y-auto"></ul>
+                    </div>
+                    <div class="glass-panel bg-white/90 rounded-xl p-5 col-span-2 relative shadow-sm">
+                        <div id="emr-placeholder" class="text-center text-slate-400 py-12">
+                            <i class="ph ph-file-text text-5xl mb-2"></i><br>Pilih pasien dari antrean di samping
+                        </div>
+                        <form id="form-emr" class="hidden space-y-4">
+                            <input type="hidden" id="emr-appointment-id">
+                            <input type="hidden" id="emr-patient-id">
+                            <div class="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg hidden" id="emr-allergy-alert">
+                                <strong>⚠️ Peringatan Alergi:</strong> <span id="emr-allergy-text"></span>
+                            </div>
+                            <div class="flex justify-between items-end border-b pb-3">
+                                <div><h3 class="text-xl font-bold text-sky-700" id="emr-patient-name">Nama Pasien</h3><p class="text-sm text-slate-500" id="emr-patient-rm">RM: 000000</p></div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div><label class="block text-sm font-bold text-slate-700 mb-1">Subjective (Keluhan)</label><textarea id="emr-s" class="w-full border rounded p-2 text-sm h-20 outline-none focus:border-sky-500 bg-white" required></textarea></div>
+                                <div><label class="block text-sm font-bold text-slate-700 mb-1">Objective (Pemeriksaan)</label><textarea id="emr-o" class="w-full border rounded p-2 text-sm h-20 outline-none focus:border-sky-500 bg-white" required></textarea></div>
+                                <div><label class="block text-sm font-bold text-slate-700 mb-1">Assessment (Diagnosa)</label><textarea id="emr-a" class="w-full border rounded p-2 text-sm h-20 outline-none focus:border-sky-500 bg-white" required></textarea></div>
+                                <div><label class="block text-sm font-bold text-slate-700 mb-1">Plan (Tindakan)</label><textarea id="emr-p" class="w-full border rounded p-2 text-sm h-20 outline-none focus:border-sky-500 bg-white" required></textarea></div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-slate-700 mb-1">Resep Obat (Pisahkan dengan koma)</label>
+                                <input type="text" id="emr-resep" class="w-full border rounded p-2 text-sm outline-none focus:border-sky-500 bg-white" placeholder="Misal: Paracetamol 500mg 3x1">
+                            </div>
+                            <div class="flex justify-end gap-2 pt-4">
+                                <button type="submit" class="bg-sky-500 text-white px-6 py-2 rounded font-bold hover:bg-sky-600 shadow">Simpan & Selesai</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modul 7: Pharmacy -->
+            <div id="view-pharmacy" class="module-view hidden space-y-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-xl font-bold">Apotek & Stok Obat</h3>
+                    <button onclick="ui.showModal('modal-medicine')" class="bg-sky-500 text-white px-4 py-2 rounded-lg text-sm font-bold shadow hover:bg-sky-600"><i class="ph ph-plus"></i> Tambah Obat</button>
+                </div>
+                <div class="glass-panel bg-white/90 rounded-xl overflow-hidden shadow-sm">
+                    <table class="w-full" id="table-pharmacy">
+                        <thead><tr><th>Nama Obat</th><th>Kategori</th><th>Stok</th><th>Harga Jual</th><th>Exp Date</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Modul 8: Billing -->
+            <div id="view-billing" class="module-view hidden space-y-4">
+                <h3 class="text-xl font-bold">Kasir & Pembayaran</h3>
+                <div class="glass-panel bg-white/90 rounded-xl overflow-hidden shadow-sm">
+                    <table class="w-full" id="table-billing">
+                        <thead><tr><th>Tanggal</th><th>Pasien</th><th>Layanan/Obat</th><th>Total Tagihan</th><th>Status</th><th>Aksi</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Modul 10, 11, 12 -->
+            <div id="view-reports" class="module-view hidden"><div class="glass-panel p-6 rounded-xl text-center"><i class="ph ph-chart-bar text-6xl text-slate-300"></i><p>Modul Laporan aktif. Data direkap otomatis.</p></div></div>
+            <div id="view-users" class="module-view hidden space-y-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-xl font-bold">Manajemen User</h3>
+                    <button onclick="ui.showModal('modal-user')" class="bg-sky-500 text-white px-4 py-2 rounded-lg text-sm font-bold shadow hover:bg-sky-600"><i class="ph ph-plus"></i> Tambah Staf</button>
+                </div>
+                <div class="glass-panel bg-white/90 rounded-xl overflow-hidden">
+                    <table class="w-full" id="table-users">
+                        <thead><tr><th>Username</th><th>Nama</th><th>Role</th><th>Status</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+            <div id="view-notifications" class="module-view hidden space-y-4"><h3 class="text-xl font-bold">Audit Log</h3><div class="glass-panel bg-white/90 rounded-xl overflow-hidden p-2"><ul id="list-audit" class="divide-y divide-slate-100 max-h-[70vh] overflow-y-auto"></ul></div></div>
+        </div>
+    </main>
+
+    <!-- Bottom Nav -->
+    <nav id="bottom-nav" class="fixed bottom-0 w-full bg-white/90 backdrop-blur-md border-t border-slate-200 justify-around items-center h-[70px] pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]"></nav>
+
+    <!-- MODALS -->
+    <div id="modal-patient" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[60] hidden items-center justify-center fade-in">
+        <div class="bg-white w-full max-w-lg rounded-2xl p-6 m-4 max-h-[90vh] overflow-y-auto relative shadow-2xl">
+            <button onclick="ui.closeModal('modal-patient')" class="absolute top-4 right-4 text-slate-400 hover:text-slate-800"><i class="ph ph-x text-xl"></i></button>
+            <h3 class="font-bold text-lg mb-4 border-b pb-2">Data Pasien Baru</h3>
+            <form id="form-patient" class="space-y-3">
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="text-xs font-bold text-slate-600">NIK</label><input type="text" id="pat-nik" class="w-full border rounded p-2 text-sm outline-none" required></div>
+                    <div><label class="text-xs font-bold text-slate-600">Nama Lengkap</label><input type="text" id="pat-nama" class="w-full border rounded p-2 text-sm outline-none" required></div>
+                    <div><label class="text-xs font-bold text-slate-600">No HP</label><input type="text" id="pat-hp" class="w-full border rounded p-2 text-sm outline-none" required></div>
+                    <div><label class="text-xs font-bold text-slate-600">Gol. Darah</label><select id="pat-goldar" class="w-full border rounded p-2 text-sm outline-none"><option>A</option><option>B</option><option>AB</option><option>O</option></select></div>
+                </div>
+                <div><label class="text-xs font-bold text-slate-600">Alamat</label><textarea id="pat-alamat" class="w-full border rounded p-2 text-sm outline-none h-16"></textarea></div>
+                <div><label class="text-xs font-bold text-slate-600">Alergi (Pisahkan Koma)</label><input type="text" id="pat-alergi" class="w-full border border-red-300 rounded p-2 text-sm outline-none placeholder-red-300" placeholder="Cth: Seafood"></div>
+                <button type="submit" class="w-full bg-sky-500 text-white font-bold py-2 rounded mt-2 hover:bg-sky-600 shadow">Simpan Pasien</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-appointment" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[60] hidden items-center justify-center fade-in">
+        <div class="bg-white w-full max-w-md rounded-2xl p-6 m-4 relative shadow-2xl">
+            <button onclick="ui.closeModal('modal-appointment')" class="absolute top-4 right-4 text-slate-400"><i class="ph ph-x"></i></button>
+            <h3 class="font-bold text-lg mb-4 border-b pb-2">Buat Janji / Antrean</h3>
+            <form id="form-appointment" class="space-y-4">
+                <div><label class="text-xs font-bold text-slate-600">Pilih Pasien</label><select id="apt-patient" class="w-full border rounded p-2 text-sm outline-none" required></select></div>
+                <div><label class="text-xs font-bold text-slate-600">Pilih Dokter/Poli</label><select id="apt-doctor" class="w-full border rounded p-2 text-sm outline-none" required></select></div>
+                <div><label class="text-xs font-bold text-slate-600">Tanggal</label><input type="date" id="apt-date" class="w-full border rounded p-2 text-sm outline-none" required></div>
+                <button type="submit" class="w-full bg-sky-500 text-white font-bold py-2 rounded hover:bg-sky-600 shadow">Buat Janji & Antrean</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-payment" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[60] hidden items-center justify-center fade-in">
+        <div class="bg-white w-full max-w-sm rounded-2xl p-6 m-4 relative text-center">
+            <button onclick="ui.closeModal('modal-payment')" class="absolute top-4 right-4 text-slate-400"><i class="ph ph-x"></i></button>
+            <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"><i class="ph ph-currency-circle-dollar"></i></div>
+            <h3 class="font-bold text-xl text-slate-800">Pembayaran Kasir</h3>
+            <p class="text-sm text-slate-500 mb-4" id="pay-patient-name"></p>
+            <div class="bg-slate-50 p-4 rounded-lg mb-4 border border-slate-100 text-left">
+                <div class="text-sm text-slate-600 mb-1 text-center">Total Tagihan</div>
+                <div class="text-3xl font-black text-emerald-600 my-1 text-center" id="pay-amount">Rp 0</div>
+                <div class="text-xs text-slate-500 mt-2 border-t pt-2 max-h-24 overflow-y-auto" id="pay-details"></div>
+            </div>
+            <div class="mb-4 text-left">
+                <label class="text-sm font-bold text-slate-700 block mb-2">Metode Pembayaran</label>
+                <select id="pay-method" class="w-full border rounded-lg p-2 outline-none focus:ring-2 focus:ring-emerald-500" onchange="app.modules.billing.toggleQris()">
+                    <option value="Cash">Tunai (Cash)</option>
+                    <option value="Transfer">Transfer Bank</option>
+                    <option value="QRIS">QRIS</option>
+                </select>
+            </div>
+            <div id="qris-box" class="hidden mb-4 p-4 border-2 border-dashed border-emerald-300 rounded-xl bg-emerald-50">
+                <i class="ph ph-qr-code text-6xl text-emerald-500 mx-auto block"></i>
+                <p class="text-xs text-emerald-700 mt-2 font-bold text-center">Scan QRIS Untuk Membayar</p>
+            </div>
+            <button onclick="app.modules.billing.processPayment()" class="w-full bg-emerald-500 text-white font-bold py-3 rounded-lg hover:bg-emerald-600 shadow-lg shadow-emerald-500/30">Terima Pembayaran</button>
+        </div>
+    </div>
+    
+    <!-- Modal Medicine (Apotek) -->
+    <div id="modal-medicine" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[60] hidden items-center justify-center fade-in">
+        <div class="bg-white w-full max-w-md rounded-2xl p-6 m-4 relative shadow-2xl">
+            <button onclick="ui.closeModal('modal-medicine')" class="absolute top-4 right-4 text-slate-400"><i class="ph ph-x"></i></button>
+            <h3 class="font-bold text-lg mb-4 border-b pb-2">Tambah Obat Baru</h3>
+            <form id="form-medicine" class="space-y-3">
+                <div><label class="text-xs font-bold text-slate-600">Nama Obat</label><input type="text" id="med-name" class="w-full border rounded p-2 outline-none" required></div>
+                <div><label class="text-xs font-bold text-slate-600">Kategori</label><input type="text" id="med-category" class="w-full border rounded p-2 outline-none" placeholder="Cth: Analgesik, Sirup" required></div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="text-xs font-bold text-slate-600">Stok Awal</label><input type="number" id="med-stock" class="w-full border rounded p-2 outline-none" required></div>
+                    <div><label class="text-xs font-bold text-slate-600">Harga Jual (Rp)</label><input type="number" id="med-price" class="w-full border rounded p-2 outline-none" required></div>
+                </div>
+                <div><label class="text-xs font-bold text-slate-600">Tanggal Expired</label><input type="date" id="med-exp" class="w-full border rounded p-2 outline-none" required></div>
+                <button type="submit" class="w-full bg-sky-500 text-white font-bold py-2 rounded mt-2 hover:bg-sky-600 shadow">Simpan Obat</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal User (Staf) -->
+    <div id="modal-user" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[60] hidden items-center justify-center fade-in">
+        <div class="bg-white w-full max-w-md rounded-2xl p-6 m-4 relative shadow-2xl">
+            <button onclick="ui.closeModal('modal-user')" class="absolute top-4 right-4 text-slate-400"><i class="ph ph-x"></i></button>
+            <h3 class="font-bold text-lg mb-4 border-b pb-2">Tambah Staf Baru</h3>
+            <form id="form-user" class="space-y-3">
+                <div><label class="text-xs font-bold text-slate-600">Username Login</label><input type="text" id="usr-uname" class="w-full border rounded p-2 outline-none" required></div>
+                <div><label class="text-xs font-bold text-slate-600">Password</label><input type="text" id="usr-pass" class="w-full border rounded p-2 outline-none" required></div>
+                <div><label class="text-xs font-bold text-slate-600">Nama Lengkap</label><input type="text" id="usr-nama" class="w-full border rounded p-2 outline-none" required></div>
+                <div><label class="text-xs font-bold text-slate-600">Role / Peran</label>
+                    <select id="usr-role" class="w-full border rounded p-2 outline-none">
+                        <option value="Admin">Admin Klinik</option>
+                        <option value="Dokter">Dokter</option>
+                        <option value="Perawat">Perawat</option>
+                        <option value="Kasir">Kasir</option>
+                        <option value="Apoteker">Apoteker</option>
+                    </select>
+                </div>
+                <button type="submit" class="w-full bg-sky-500 text-white font-bold py-2 rounded mt-2 hover:bg-sky-600 shadow">Simpan Staf</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="print-area" class="hidden bg-white font-sans text-slate-800"></div>
+
+    <script type="module">
+        // VERSION 3 - Memicu database baru dengan data dummy yang komprehensif
+        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'clinic-2026-v3';
+        
+        const manifestData = { name: "Clinic Management", short_name: "Clinic CMS", start_url: ".", display: "standalone", background_color: "#f0fdfa", theme_color: "#0ea5e9", icons: [{ src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%230ea5e9'/%3E%3Cpath d='M50 20v60M20 50h60' stroke='white' stroke-width='15' stroke-linecap='round'/%3E%3C/svg%3E", sizes: "192x192", type: "image/svg+xml" }]};
+        const manifestBlob = new Blob([JSON.stringify(manifestData)], { type: 'application/json' });
+        document.getElementById('manifest-placeholder').href = URL.createObjectURL(manifestBlob);
+
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, getDocs, onSnapshot, query, where, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        let firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "DEMO_KEY", authDomain: "demo.firebaseapp.com", projectId: "demo" };
+        const fbApp = initializeApp(firebaseConfig);
+        const auth = getAuth(fbApp);
+        const db = getFirestore(fbApp);
+
+        const getCol = (name) => collection(db, 'artifacts', APP_ID, 'public', 'data', name);
+        const getDocRef = (name, id) => doc(db, 'artifacts', APP_ID, 'public', 'data', name, id);
+
+        const state = { currentUser: null, activeView: 'dashboard', data: { patients: [], doctors: [], appointments: [], queues: [], pharmacy: [], billing: [], users: [] }, unsubscribers: [] };
+
+        const MENU_ITEMS = [
+            { id: 'dashboard', icon: 'ph-squares-four', label: 'Dashboard', roles: ['SuperAdmin', 'Admin', 'Dokter', 'Perawat', 'Kasir', 'Apoteker'] },
+            { id: 'patients', icon: 'ph-users', label: 'Pasien', roles: ['SuperAdmin', 'Admin', 'Perawat', 'Dokter'] },
+            { id: 'appointments', icon: 'ph-calendar-plus', label: 'Jadwal', roles: ['SuperAdmin', 'Admin', 'Perawat'] },
+            { id: 'queue', icon: 'ph-monitor', label: 'Antrean', roles: ['SuperAdmin', 'Admin', 'Perawat', 'Dokter'] },
+            { id: 'emr', icon: 'ph-stethoscope', label: 'EMR (SOAP)', roles: ['SuperAdmin', 'Dokter'] },
+            { id: 'pharmacy', icon: 'ph-pill', label: 'Apotek', roles: ['SuperAdmin', 'Admin', 'Apoteker'] },
+            { id: 'billing', icon: 'ph-receipt', label: 'Kasir', roles: ['SuperAdmin', 'Admin', 'Kasir'] },
+            { id: 'reports', icon: 'ph-chart-bar', label: 'Laporan', roles: ['SuperAdmin', 'Admin'] },
+            { id: 'users', icon: 'ph-user-gear', label: 'Staf & Akses', roles: ['SuperAdmin'] }
+        ];
+
+        const ui = {
+            showModal: (id) => { document.getElementById(id).classList.remove('hidden'); document.getElementById(id).style.display = 'flex'; },
+            closeModal: (id) => { document.getElementById(id).classList.add('hidden'); document.getElementById(id).style.display = 'none'; },
+            showLoading: () => document.getElementById('loading-spinner').classList.remove('hidden'),
+            hideLoading: () => document.getElementById('loading-spinner').classList.add('hidden'),
+            formatRupiah: (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka),
+            toast: (msg) => { alert(msg); },
+            renderNav: () => {
+                const navContainer = document.getElementById('nav-container'); const bottomNav = document.getElementById('bottom-nav');
+                navContainer.innerHTML = ''; bottomNav.innerHTML = '';
+                MENU_ITEMS.forEach(menu => {
+                    if (menu.roles.includes(state.currentUser.role)) {
+                        const div = document.createElement('div');
+                        div.className = `nav-item flex items-center gap-3 px-6 py-3 cursor-pointer text-slate-600 hover:bg-slate-50 transition ${state.activeView === menu.id ? 'active' : ''}`;
+                        div.innerHTML = `<i class="ph ${menu.icon} text-xl"></i> <span class="font-medium">${menu.label}</span>`;
+                        div.onclick = () => app.navigate(menu.id); navContainer.appendChild(div);
+                        if(bottomNav.children.length < 5) {
+                            const bDiv = document.createElement('div');
+                            bDiv.className = `bottom-nav-item flex flex-col items-center p-2 text-xs text-slate-500 ${state.activeView === menu.id ? 'active' : ''}`;
+                            bDiv.innerHTML = `<i class="ph ${menu.icon} text-2xl mb-1"></i><span>${menu.label.split(' ')[0]}</span>`;
+                            bDiv.onclick = () => app.navigate(menu.id); bottomNav.appendChild(bDiv);
+                        }
+                    }
+                });
+                document.getElementById('user-name-display').textContent = state.currentUser.profile?.nama || state.currentUser.username;
+                document.getElementById('user-role-display').textContent = state.currentUser.role;
+                document.getElementById('user-avatar').textContent = (state.currentUser.profile?.nama || state.currentUser.username).charAt(0).toUpperCase();
+            }
+        };
+
+        const app = {
+            init: () => {
+                document.getElementById('login-form').addEventListener('submit', app.auth.handleLogin);
+                document.getElementById('btn-logout').addEventListener('click', app.auth.logout);
+                document.getElementById('open-sidebar').addEventListener('click', () => document.getElementById('sidebar').classList.add('open'));
+                document.getElementById('close-sidebar').addEventListener('click', () => document.getElementById('sidebar').classList.remove('open'));
+                document.getElementById('form-patient').addEventListener('submit', app.modules.patients.save);
+                document.getElementById('form-appointment').addEventListener('submit', app.modules.appointments.save);
+                document.getElementById('form-emr').addEventListener('submit', app.modules.emr.save);
+                document.getElementById('form-medicine').addEventListener('submit', app.modules.pharmacy.save);
+                document.getElementById('form-user').addEventListener('submit', app.modules.users.save);
+                
+                onAuthStateChanged(auth, (user) => {
+                    if (!user || !state.currentUser) { 
+                        document.getElementById('login-screen').style.display = 'flex'; 
+                    }
+                });
+            },
+            navigate: (viewId) => {
+                document.querySelectorAll('.module-view').forEach(el => el.classList.add('hidden'));
+                const viewEl = document.getElementById(`view-${viewId}`);
+                if(viewEl) viewEl.classList.remove('hidden');
+                
+                state.activeView = viewId;
+                document.getElementById('header-title').textContent = MENU_ITEMS.find(m => m.id === viewId)?.label || 'Aplikasi';
+                ui.renderNav();
+                document.getElementById('sidebar').classList.remove('open');
+            },
+            startApp: () => {
+                document.getElementById('login-screen').style.display = 'none';
+                ui.renderNav();
+                app.navigate('dashboard');
+                app.startRealtimeListeners();
+                app.logAudit('LOGIN', 'User logged in to system');
+            },
+            logAudit: async (action, details) => {
+                if(!state.currentUser) return;
+                try {
+                    await addDoc(getCol('audit_logs'), { userId: state.currentUser.username, role: state.currentUser.role, action: action, details: details, timestamp: new Date().toISOString() });
+                } catch(e) { console.error("Audit fail", e); }
+            },
+            
+            // FUNGSI INJEKSI DATA DUMMY KOMPREHENSIF
+            autoSetupDatabase: async () => {
+                ui.showLoading();
+                try {
+                    const snap = await getDocs(getCol('users'));
+                    if (snap.empty) {
+                        console.log("Menyuntikkan data skenario komprehensif...");
+                        const today = new Date().toISOString().split('T')[0];
+                        const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+                        // 1. Data User (Staf)
+                        const users = [
+                            { id: 'usr_admin', username: 'admin', password: 'admin123', role: 'SuperAdmin', profile: { nama: 'Super Admin', spesialisasi: 'Sistem' }, isActive: true },
+                            { id: 'usr_doc1', username: 'dr_andi', password: 'doc123', role: 'Dokter', profile: { nama: 'Dr. Andi Pratama', spesialisasi: 'Umum' }, isActive: true },
+                            { id: 'usr_nurse1', username: 'perawat1', password: 'nurse123', role: 'Perawat', profile: { nama: 'Suster Rina' }, isActive: true },
+                            { id: 'usr_cashier1', username: 'kasir1', password: 'kasir123', role: 'Kasir', profile: { nama: 'Budi Kasir' }, isActive: true },
+                            { id: 'usr_pharm1', username: 'apotek1', password: 'apt123', role: 'Apoteker', profile: { nama: 'Siti Farmasi' }, isActive: true }
+                        ];
+                        for(let u of users) await setDoc(getDocRef('users', u.id), u);
+
+                        // 2. Data Pasien
+                        const patients = [
+                            { id: 'RM-26001', nik: '1234567890', namaLengkap: 'Bapak Sudirman', gender: 'L', golDarah: 'O', kontak: { hp: '081234567' }, medis: { alergi: 'Seafood' }, createdAt: yesterday },
+                            { id: 'RM-26002', nik: '0987654321', namaLengkap: 'Ibu Pertiwi', gender: 'P', golDarah: 'A', kontak: { hp: '089876543' }, medis: { alergi: '' }, createdAt: today },
+                            { id: 'RM-26003', nik: '1122334455', namaLengkap: 'Budi Santoso', gender: 'L', golDarah: 'B', kontak: { hp: '081122334' }, medis: { alergi: 'Debu' }, createdAt: today }
+                        ];
+                        for(let p of patients) await setDoc(getDocRef('patients', p.id), p);
+
+                        // 3. Data Apotek & Obat (Termasuk skenario stok habis & expired)
+                        const meds = [
+                            { id: 'med_1', namaObat: 'Paracetamol 500mg', kategori: 'Analgesik', stock: 500, minStock: 20, hargaJual: 5000, expiredDate: '2027-12-01' },
+                            { id: 'med_2', namaObat: 'Amoxicillin 500mg', kategori: 'Antibiotik', stock: 200, minStock: 20, hargaJual: 15000, expiredDate: '2026-08-01' },
+                            { id: 'med_3', namaObat: 'Vitamin C 1000mg', kategori: 'Vitamin', stock: 5, minStock: 10, hargaJual: 10000, expiredDate: '2023-01-01' }, // Sengaja expired & low stock
+                            { id: 'med_4', namaObat: 'Sirup Batuk Anak', kategori: 'Sirup', stock: 15, minStock: 20, hargaJual: 25000, expiredDate: '2026-07-15' } // Hampir expired
+                        ];
+                        for(let m of meds) await setDoc(getDocRef('pharmacy', m.id), m);
+
+                        // 4. Data Jadwal (Appointments)
+                        const apts = [
+                            { id: 'apt_1', patientId: 'RM-26001', doctorId: 'usr_doc1', date: yesterday, status: 'Completed' }, 
+                            { id: 'apt_2', patientId: 'RM-26002', doctorId: 'usr_doc1', date: today, status: 'Booked' },
+                            { id: 'apt_3', patientId: 'RM-26003', doctorId: 'usr_doc1', date: today, status: 'Confirmed' }
+                        ];
+                        for(let a of apts) await setDoc(getDocRef('appointments', a.id), a);
+
+                        // 5. Data Antrean Ruang Tunggu (Khusus hari ini)
+                        const queues = [
+                            { id: 'q_1', tanggal: today, nomor: 1, patientId: 'RM-26003', appointmentId: 'apt_3', status: 'Waiting' },
+                            { id: 'q_2', tanggal: today, nomor: 2, patientId: 'RM-26002', appointmentId: 'apt_2', status: 'Waiting' }
+                        ];
+                        for(let q of queues) await setDoc(getDocRef('queues', q.id), q);
+
+                        // 6. Data EMR / Rekam Medis (Kunjungan Kemarin)
+                        await setDoc(getDocRef('emr', 'emr_1'), {
+                            patientId: 'RM-26001', appointmentId: 'apt_1', doctorId: 'usr_doc1',
+                            soap: { s: 'Demam tinggi selama 3 hari', o: 'Suhu tubuh 38.5C, Nadi 90x/m', a: 'Fever (Observasi Febris)', p: 'Istirahat dan minum obat teratur' },
+                            resepTxt: 'Paracetamol 500mg 3x1', createdAt: yesterday
+                        });
+
+                        // 7. Data Tagihan / Kasir
+                        const bills = [
+                            { id: 'bill_1', patientId: 'RM-26001', appointmentId: 'apt_1', date: yesterday, totalAmount: 150000, details: [{item: 'Jasa Konsultasi Dokter', price: 100000}, {item: 'Resep Obat', price: 50000}], status: 'Paid', paymentMethod: 'QRIS', paidAt: yesterday, cashierId: 'kasir1' },
+                            { id: 'bill_2', patientId: 'RM-26003', appointmentId: 'apt_3', date: today, totalAmount: 100000, details: [{item: 'Konsultasi (Deposit)', price: 100000}], status: 'Unpaid' }
+                        ];
+                        for(let b of bills) await setDoc(getDocRef('billing', b.id), b);
+
+                        // 8. Data Audit Log Sistem
+                        await addDoc(getCol('audit_logs'), { userId: 'admin', role: 'SuperAdmin', action: 'SYSTEM_INIT', details: 'Sistem diinisialisasi dengan data dummy skenario klinik komprehensif', timestamp: new Date().toISOString() });
+                    }
+                } catch (e) { console.error("Auto setup error:", e); }
+                ui.hideLoading();
+            },
+            
+            startRealtimeListeners: () => {
+                state.unsubscribers.forEach(unsub => unsub());
+                state.unsubscribers = [];
+                // Menambahkan Error Handling (Callback) pada setiap listener untuk standar Production
+                state.unsubscribers.push(onSnapshot(getCol('patients'), (snap) => { state.data.patients = snap.docs.map(d => ({id: d.id, ...d.data()})); if(app.modules.patients.render) app.modules.patients.render(); if(app.modules.appointments.updateDropdowns) app.modules.appointments.updateDropdowns(); }, (err) => console.error("Pasien sync err:", err)));
+                state.unsubscribers.push(onSnapshot(getCol('users'), (snap) => { state.data.users = snap.docs.map(d => ({id: d.id, ...d.data()})); state.data.doctors = state.data.users.filter(u => u.role === 'Dokter'); if(app.modules.appointments.updateDropdowns) app.modules.appointments.updateDropdowns(); if(app.modules.users.render) app.modules.users.render(); }, (err) => console.error("Users sync err:", err)));
+                state.unsubscribers.push(onSnapshot(getCol('appointments'), (snap) => { state.data.appointments = snap.docs.map(d => ({id: d.id, ...d.data()})); if(app.modules.appointments.render) app.modules.appointments.render(); if(app.modules.dashboard.render) app.modules.dashboard.render(); }, (err) => console.error("Appointments sync err:", err)));
+                
+                const today = new Date().toISOString().split('T')[0];
+                // Memfilter antrean langsung di memory JS untuk menghindari masalah Indexing Firebase di Production
+                state.unsubscribers.push(onSnapshot(getCol('queues'), (snap) => { 
+                    state.data.queues = snap.docs.map(d => ({id: d.id, ...d.data()})).filter(q => q.tanggal === today).sort((a,b) => a.nomor - b.nomor); 
+                    if(app.modules.queue.render) app.modules.queue.render(); 
+                    if(app.modules.emr.renderQueue) app.modules.emr.renderQueue(); 
+                }, (err) => console.error("Queues sync err:", err)));
+                
+                state.unsubscribers.push(onSnapshot(getCol('pharmacy'), (snap) => { state.data.pharmacy = snap.docs.map(d => ({id: d.id, ...d.data()})); if(app.modules.pharmacy.render) app.modules.pharmacy.render(); }, (err) => console.error("Pharmacy sync err:", err)));
+                state.unsubscribers.push(onSnapshot(getCol('billing'), (snap) => { state.data.billing = snap.docs.map(d => ({id: d.id, ...d.data()})); if(app.modules.billing.render) app.modules.billing.render(); if(app.modules.dashboard.render) app.modules.dashboard.render(); }, (err) => console.error("Billing sync err:", err)));
+                
+                if(state.currentUser.role === 'SuperAdmin') {
+                    state.unsubscribers.push(onSnapshot(getCol('audit_logs'), (snap) => {
+                        let logs = snap.docs.map(d => d.data()).sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+                        const ul = document.getElementById('list-audit');
+                        if(ul) { ul.innerHTML = logs.map(l => `<li class="p-3"><div class="text-sm font-bold text-slate-700">${l.action} <span class="text-xs text-slate-400 font-normal float-right">${new Date(l.timestamp).toLocaleString('id-ID')}</span></div><div class="text-xs text-slate-600">${l.details} (User: ${l.userId})</div></li>`).join(''); }
+                    }, (err) => console.error("Audit logs sync err:", err)));
+                }
+            },
+            auth: {
+                handleLogin: async (e) => {
+                    e.preventDefault(); ui.showLoading();
+                    const errEl = document.getElementById('login-error'); if(errEl) errEl.classList.add('hidden');
+                    const u = document.getElementById('login-username').value; const p = document.getElementById('login-password').value; const isAdmin = document.getElementById('login-is-admin').checked;
+                    try {
+                        if (isAdmin) {
+                            try { await signInWithEmailAndPassword(auth, u, p); } catch (authErr) {
+                                if (u === 'admin' && p === 'admin123') {
+                                    await signInAnonymously(auth);
+                                    state.currentUser = { uid: auth.currentUser.uid, username: 'admin', role: 'SuperAdmin', profile: { nama: 'Super Admin' } };
+                                    await app.autoSetupDatabase(); app.startApp(); ui.hideLoading(); return;
+                                }
+                                throw authErr;
+                            }
+                        } else {
+                            await signInAnonymously(auth);
+                            const checkSnap = await getDocs(getCol('users')); if (checkSnap.empty) { await app.autoSetupDatabase(); }
+                            
+                            // Memfilter kecocokan login staf di dalam memory (Menghindari Limitasi Index Firebase)
+                            const snap = await getDocs(getCol('users'));
+                            const userDoc = snap.docs.find(d => {
+                                const data = d.data();
+                                return data.username === u && data.password === p && data.isActive === true;
+                            });
+                            
+                            if (userDoc) {
+                                const userData = userDoc.data(); state.currentUser = { uid: auth.currentUser.uid, id: userDoc.id, ...userData };
+                                app.startApp();
+                            } else { await signOut(auth); if(errEl) errEl.classList.remove('hidden'); }
+                        }
+                    } catch (error) { console.error(error); if(errEl) { errEl.classList.remove('hidden'); errEl.textContent = 'Kredensial tidak valid'; } }
+                    ui.hideLoading();
+                },
+                logout: async () => { await app.logAudit('LOGOUT', 'User logged out'); await signOut(auth); state.currentUser = null; state.unsubscribers.forEach(unsub => unsub()); window.location.reload(); }
+            },
+            modules: {
+                dashboard: {
+                    chartInstance: null,
+                    render: () => {
+                        const today = new Date().toISOString().split('T')[0]; const currentMonth = today.substring(0, 7);
+                        const adminCards = document.querySelectorAll('.admin-only-card');
+                        if(['SuperAdmin', 'Admin', 'Kasir'].includes(state.currentUser.role)) { adminCards.forEach(c => c.style.display = 'block'); } else { adminCards.forEach(c => c.style.display = 'none'); }
+                        const todaysApts = state.data.appointments.filter(a => a.date === today); const pendingApts = state.data.appointments.filter(a => a.status === 'Booked');
+                        document.getElementById('dash-pasien').textContent = todaysApts.length; document.getElementById('dash-antrean').textContent = state.data.queues.filter(q => q.status === 'Waiting').length;
+                        document.getElementById('dash-dokter').textContent = state.data.doctors.length; document.getElementById('dash-pending-apt').textContent = pendingApts.length;
+                        document.getElementById('dash-pendapatan').textContent = ui.formatRupiah(state.data.billing.filter(b => b.status === 'Paid' && b.date === today).reduce((sum, b) => sum + b.totalAmount, 0));
+                        document.getElementById('dash-pendapatan-bulan').textContent = ui.formatRupiah(state.data.billing.filter(b => b.status === 'Paid' && b.date.startsWith(currentMonth)).reduce((sum, b) => sum + b.totalAmount, 0));
+                        let alertItems = [];
+                        state.data.pharmacy.forEach(p => {
+                            if(p.stock <= (p.minStock || 10)) alertItems.push(`<li class="flex items-center gap-2 text-sm"><i class="ph ph-warning text-orange-500"></i> Stok Menipis: ${p.namaObat} (Sisa ${p.stock})</li>`);
+                            if(p.expiredDate) {
+                                const diffDays = Math.ceil((new Date(p.expiredDate) - new Date()) / (1000 * 60 * 60 * 24));
+                                if(diffDays <= 30 && diffDays >= 0) alertItems.push(`<li class="flex items-center gap-2 text-sm"><i class="ph ph-clock-countdown text-red-500"></i> Expired Dekat: ${p.namaObat} (${diffDays} hr lagi)</li>`);
+                                else if (diffDays < 0) alertItems.push(`<li class="flex items-center gap-2 text-sm"><i class="ph ph-x-circle text-red-700 font-bold"></i> Telah Expired: ${p.namaObat}</li>`);
+                            }
+                        });
+                        if(alertItems.length === 0) alertItems.push('<li class="text-sm text-slate-400">Aman, tidak ada alert.</li>');
+                        document.getElementById('list-dash-alerts').innerHTML = alertItems.join('');
+                        app.modules.dashboard.renderChart();
+                    },
+                    renderChart: () => {
+                        const ctx = document.getElementById('dashboard-chart'); if(!ctx) return;
+                        const labels = []; const dataPasien = [];
+                        for(let i=6; i>=0; i--) { const d = new Date(); d.setDate(d.getDate() - i); const dateStr = d.toISOString().split('T')[0]; labels.push(d.toLocaleDateString('id-ID', {day:'numeric', month:'short'})); dataPasien.push(state.data.appointments.filter(a => a.date === dateStr).length); }
+                        if(app.modules.dashboard.chartInstance) app.modules.dashboard.chartInstance.destroy();
+                        app.modules.dashboard.chartInstance = new Chart(ctx, { type: 'line', data: { labels: labels, datasets: [{ label: 'Total Kunjungan', data: dataPasien, borderColor: '#0ea5e9', backgroundColor: 'rgba(14, 165, 233, 0.1)', borderWidth: 3, fill: true, tension: 0.4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } } });
+                    }
+                },
+                patients: {
+                    render: () => { document.querySelector('#table-patients tbody').innerHTML = state.data.patients.map(p => `<tr><td class="font-bold text-sky-600">${p.id}</td><td>${p.namaLengkap} <div class="text-xs text-slate-500">NIK: ${p.nik}</div></td><td>${p.kontak?.hp || '-'}</td><td>${p.golDarah || '-'}</td><td><button class="text-sky-500"><i class="ph ph-pencil-simple text-lg"></i></button></td></tr>`).join(''); },
+                    save: async (e) => { e.preventDefault(); ui.showLoading(); const id = 'RM-' + Math.floor(100000 + Math.random() * 900000); await setDoc(getDocRef('patients', id), { id: id, nik: document.getElementById('pat-nik').value, namaLengkap: document.getElementById('pat-nama').value, golDarah: document.getElementById('pat-goldar').value, kontak: { hp: document.getElementById('pat-hp').value, alamat: document.getElementById('pat-alamat').value }, medis: { alergi: document.getElementById('pat-alergi').value }, createdAt: new Date().toISOString() }); ui.closeModal('modal-patient'); e.target.reset(); ui.toast("Pasien berhasil disimpan!"); ui.hideLoading(); }
+                },
+                appointments: {
+                    updateDropdowns: () => { document.getElementById('apt-patient').innerHTML = state.data.patients.map(p => `<option value="${p.id}">${p.id} - ${p.namaLengkap}</option>`).join(''); document.getElementById('apt-doctor').innerHTML = state.data.doctors.map(d => `<option value="${d.id}">${d.profile?.nama} (${d.profile?.spesialisasi})</option>`).join(''); },
+                    render: () => { document.querySelector('#table-appointments tbody').innerHTML = state.data.appointments.map(a => `<tr><td>${a.date}</td><td>${state.data.patients.find(x => x.id === a.patientId)?.namaLengkap||'-'}</td><td>${state.data.users.find(x => x.id === a.doctorId)?.profile?.nama||'-'}</td><td><span class="px-2 py-1 bg-slate-100 rounded-full text-xs">${a.status}</span></td><td>-</td></tr>`).join(''); },
+                    save: async (e) => { e.preventDefault(); ui.showLoading(); const pId = document.getElementById('apt-patient').value; const date = document.getElementById('apt-date').value; const aptRef = await addDoc(getCol('appointments'), { patientId: pId, doctorId: document.getElementById('apt-doctor').value, date: date, status: 'Booked' }); if(date === new Date().toISOString().split('T')[0]) await addDoc(getCol('queues'), { tanggal: date, nomor: state.data.queues.length + 1, patientId: pId, appointmentId: aptRef.id, status: 'Waiting' }); ui.closeModal('modal-appointment'); ui.toast("Janji & antrean berhasil dibuat."); ui.hideLoading(); }
+                },
+                queue: {
+                    isTvMode: false,
+                    render: () => {
+                        document.querySelector('#table-queue tbody').innerHTML = state.data.queues.map(q => `<tr><td class="font-bold text-lg text-center w-20">A-${q.nomor}</td><td>${state.data.patients.find(x => x.id === q.patientId)?.namaLengkap||'-'}</td><td>Poli Umum</td><td><span class="px-2 py-1 rounded text-xs ${q.status==='Called'?'bg-emerald-100 text-emerald-700':'bg-slate-100'}">${q.status}</span></td><td>${q.status === 'Waiting' ? `<button onclick="app.modules.queue.call('${q.id}')" class="text-sky-600 font-bold px-3 py-1 bg-sky-50 rounded hover:bg-sky-100"><i class="ph ph-speaker-high"></i> Panggil</button>` : ''}</td></tr>`).join('');
+                        const called = state.data.queues.filter(q => q.status === 'Called').pop();
+                        if(called) { document.getElementById('current-queue-number').textContent = `A-${called.nomor}`; document.getElementById('current-queue-patient').textContent = state.data.patients.find(x => x.id === called.patientId)?.namaLengkap || '-'; }
+                    },
+                    call: async (id) => {
+                        ui.showLoading(); await updateDoc(getDocRef('queues', id), { status: 'Called' }); const q = state.data.queues.find(x => x.id === id);
+                        if(q && 'speechSynthesis' in window) { const utter = new SpeechSynthesisUtterance(`Nomor antrean, A, ${q.nomor}. Silakan menuju ke ruangan dokter.`); utter.lang = 'id-ID'; window.speechSynthesis.speak(utter); }
+                        ui.hideLoading();
+                    },
+                    callNext: () => { const next = state.data.queues.find(q => q.status === 'Waiting'); if(next) app.modules.queue.call(next.id); else ui.toast("Antrean kosong."); },
+                    toggleTvMode: () => {
+                        app.modules.queue.isTvMode = !app.modules.queue.isTvMode;
+                        const els = { header: document.getElementById('main-header'), sidebar: document.getElementById('sidebar'), tvCont: document.getElementById('queue-display-container'), actBtns: document.getElementById('queue-action-buttons'), tblCont: document.getElementById('queue-table-container'), extBtn: document.getElementById('exit-tv-mode'), tvBtn: document.getElementById('queue-tv-btn-container'), numDisp: document.getElementById('current-queue-number'), tvTitle: document.getElementById('queue-display-title') };
+                        if(app.modules.queue.isTvMode) {
+                            els.sidebar.classList.add('hidden'); els.header.classList.add('hidden'); els.actBtns.classList.add('hidden'); els.tblCont.classList.add('hidden'); els.tvBtn.classList.add('hidden'); els.extBtn.classList.remove('hidden'); els.tvCont.classList.remove('p-8'); els.tvCont.classList.add('fixed', 'inset-0', 'z-[200]', 'flex', 'flex-col', 'justify-center', 'items-center', 'bg-white'); els.tvTitle.classList.replace('text-2xl', 'text-5xl'); els.numDisp.classList.replace('text-6xl', 'text-[15rem]'); if(document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(()=>{});
+                        } else {
+                            els.sidebar.classList.remove('hidden'); els.header.classList.remove('hidden'); els.actBtns.classList.remove('hidden'); els.tblCont.classList.remove('hidden'); els.tvBtn.classList.remove('hidden'); els.extBtn.classList.add('hidden'); els.tvCont.classList.remove('fixed', 'inset-0', 'z-[200]', 'flex', 'flex-col', 'justify-center', 'items-center', 'bg-white'); els.tvCont.classList.add('p-8'); els.tvTitle.classList.replace('text-5xl', 'text-2xl'); els.numDisp.classList.replace('text-[15rem]', 'text-6xl'); if(document.exitFullscreen) document.exitFullscreen().catch(()=>{});
+                        }
+                    }
+                },
+                emr: {
+                    renderQueue: () => { document.getElementById('list-emr-queue').innerHTML = state.data.queues.filter(q => q.status !== 'Completed').map(q => { const p = state.data.patients.find(x => x.id === q.patientId); return `<li class="p-3 border rounded-lg hover:bg-sky-50 cursor-pointer transition flex justify-between items-center bg-white" onclick="app.modules.emr.selectPatient('${q.id}', '${p?.id}', '${q.appointmentId}')"><div><div class="font-bold text-sm">${p?.namaLengkap}</div><div class="text-xs text-slate-500">Antrean: A-${q.nomor}</div></div><i class="ph ph-caret-right text-slate-400"></i></li>`; }).join('') || '<div class="text-sm text-slate-400 text-center p-4">Antrean kosong</div>'; },
+                    selectPatient: (queueId, patientId, aptId) => {
+                        const p = state.data.patients.find(x => x.id === patientId); if(!p) return;
+                        document.getElementById('emr-placeholder').classList.add('hidden'); document.getElementById('form-emr').classList.remove('hidden');
+                        document.getElementById('emr-patient-name').textContent = p.namaLengkap; document.getElementById('emr-patient-id').value = p.id; document.getElementById('emr-appointment-id').value = aptId; document.getElementById('form-emr').dataset.queueId = queueId;
+                        if(p.medis?.alergi) { document.getElementById('emr-allergy-alert').classList.remove('hidden'); document.getElementById('emr-allergy-text').textContent = p.medis.alergi; } else document.getElementById('emr-allergy-alert').classList.add('hidden');
+                    },
+                    save: async (e) => {
+                        e.preventDefault(); ui.showLoading();
+                        const pId = document.getElementById('emr-patient-id').value; const aptId = document.getElementById('emr-appointment-id').value; const qId = document.getElementById('form-emr').dataset.queueId; const resepStr = document.getElementById('emr-resep').value;
+                        await addDoc(getCol('emr'), { patientId: pId, appointmentId: aptId, doctorId: state.currentUser.id, soap: { s: document.getElementById('emr-s').value, o: document.getElementById('emr-o').value, a: document.getElementById('emr-a').value, p: document.getElementById('emr-p').value }, resepTxt: resepStr, createdAt: new Date().toISOString() });
+                        let billDetails = [{ item: "Jasa Konsultasi Dokter", price: 100000 }]; if(resepStr) billDetails.push({ item: "Resep Obat", price: 50000 });
+                        await addDoc(getCol('billing'), { patientId: pId, appointmentId: aptId, date: new Date().toISOString().split('T')[0], totalAmount: billDetails.reduce((s,d)=>s+d.price,0), details: billDetails, status: 'Unpaid' });
+                        if(qId) await updateDoc(getDocRef('queues', qId), { status: 'Completed' }); if(aptId) await updateDoc(getDocRef('appointments', aptId), { status: 'Completed' });
+                        e.target.reset(); document.getElementById('emr-placeholder').classList.remove('hidden'); document.getElementById('form-emr').classList.add('hidden'); ui.toast("Selesai. Tagihan dikirim ke Kasir."); ui.hideLoading();
+                    }
+                },
+                pharmacy: {
+                    render: () => { document.querySelector('#table-pharmacy tbody').innerHTML = state.data.pharmacy.map(p => `<tr><td class="font-bold">${p.namaObat}</td><td>${p.kategori}</td><td>${p.stock}</td><td>${ui.formatRupiah(p.hargaJual)}</td><td>${p.expiredDate}</td></tr>`).join(''); },
+                    save: async (e) => { e.preventDefault(); ui.showLoading(); await addDoc(getCol('pharmacy'), { namaObat: document.getElementById('med-name').value, kategori: document.getElementById('med-category').value, stock: parseInt(document.getElementById('med-stock').value), hargaJual: parseInt(document.getElementById('med-price').value), expiredDate: document.getElementById('med-exp').value }); ui.closeModal('modal-medicine'); e.target.reset(); ui.toast("Obat berhasil ditambahkan!"); ui.hideLoading(); }
+                },
+                billing: {
+                    activeBillId: null,
+                    render: () => {
+                        document.querySelector('#table-billing tbody').innerHTML = state.data.billing.map(b => {
+                            const p = state.data.patients.find(x => x.id === b.patientId);
+                            let action = b.status === 'Unpaid' ? `<button onclick="app.modules.billing.openPayment('${b.id}')" class="bg-emerald-500 text-white px-3 py-1 rounded text-xs font-bold shadow hover:bg-emerald-600">Bayar</button>` : `<button onclick="app.modules.billing.printReceipt('${b.id}')" class="text-slate-500 hover:text-sky-600 text-xs border border-slate-300 bg-white px-3 py-1 rounded-md transition shadow-sm"><i class="ph ph-printer"></i> Cetak Struk/PDF</button>`;
+                            return `<tr><td>${b.date}</td><td class="font-bold">${p?.namaLengkap||'-'}</td><td>${b.details?.map(d=>d.item).join(', ')||'Konsultasi'}</td><td class="font-bold text-slate-700">${ui.formatRupiah(b.totalAmount)}</td><td><span class="px-2 py-1 rounded text-xs ${b.status==='Paid'?'bg-emerald-100 text-emerald-700':'bg-red-100 text-red-700'}">${b.status}</span><div class="text-[10px] text-slate-400 mt-1">${b.paymentMethod ? 'Via ' + b.paymentMethod : ''}</div></td><td>${action}</td></tr>`;
+                        }).join('');
+                    },
+                    toggleQris: () => { const method = document.getElementById('pay-method').value; const box = document.getElementById('qris-box'); if(method === 'QRIS') box.classList.remove('hidden'); else box.classList.add('hidden'); },
+                    openPayment: (billId) => {
+                        const bill = state.data.billing.find(b => b.id === billId); const p = state.data.patients.find(x => x.id === bill.patientId); if(!bill) return;
+                        app.modules.billing.activeBillId = billId; document.getElementById('pay-patient-name').textContent = p?.namaLengkap; document.getElementById('pay-amount').textContent = ui.formatRupiah(bill.totalAmount);
+                        document.getElementById('pay-details').innerHTML = bill.details.map(d => `<div class="flex justify-between mb-1"><span>${d.item}</span><strong>${ui.formatRupiah(d.price)}</strong></div>`).join('');
+                        document.getElementById('pay-method').value = 'Cash'; app.modules.billing.toggleQris(); ui.showModal('modal-payment');
+                    },
+                    processPayment: async () => {
+                        if(!app.modules.billing.activeBillId) return; ui.showLoading(); const method = document.getElementById('pay-method').value;
+                        await updateDoc(getDocRef('billing', app.modules.billing.activeBillId), { status: 'Paid', paymentMethod: method, paidAt: new Date().toISOString(), cashierId: state.currentUser.username });
+                        app.logAudit('PAYMENT', `Bill ${app.modules.billing.activeBillId} paid via ${method}`); ui.closeModal('modal-payment'); ui.toast(`Pembayaran lunas!`); ui.hideLoading();
+                    },
+                    printReceipt: (billId) => {
+                        const bill = state.data.billing.find(b => b.id === billId); const p = state.data.patients.find(x => x.id === bill.patientId); if(!bill || !p) return;
+                        app.logAudit('PRINT_RECEIPT', `Printed receipt for bill ${billId}`);
+                        document.getElementById('print-area').innerHTML = `<div style="max-width: 400px; margin: 0 auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px; font-family: sans-serif;"><div style="text-align: center; border-bottom: 2px dashed #ccc; padding-bottom: 15px; margin-bottom: 15px;"><h2 style="margin: 0; color: #0ea5e9; font-size: 24px;">KLINIK 2026</h2><p style="margin: 5px 0 0 0; font-size: 12px; color: #666;">Jl. Kesehatan No. 123, Kota Medis<br>Telp: (021) 555-0123</p></div><table style="width: 100%; font-size: 14px; margin-bottom: 20px;"><tr><td style="color: #666;">No. Kwitansi</td><td style="text-align: right; font-weight: bold;">INV-${billId.substring(0,6).toUpperCase()}</td></tr><tr><td style="color: #666;">Tanggal</td><td style="text-align: right;">${new Date(bill.paidAt).toLocaleString('id-ID')}</td></tr><tr><td style="color: #666;">Pasien</td><td style="text-align: right; font-weight: bold;">${p.namaLengkap}</td></tr><tr><td style="color: #666;">Kasir</td><td style="text-align: right;">${bill.cashierId}</td></tr></table><div style="font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 10px;">Rincian Layanan & Obat</div><table style="width: 100%; font-size: 14px; margin-bottom: 20px;">${bill.details.map(d => `<tr><td style="padding-bottom: 5px;">${d.item}</td><td style="text-align: right; padding-bottom: 5px;">${ui.formatRupiah(d.price)}</td></tr>`).join('')}</table><div style="border-top: 2px dashed #ccc; padding-top: 15px; margin-top: 15px;"><table style="width: 100%; font-size: 16px;"><tr><td style="font-weight: bold;">TOTAL TAGIHAN</td><td style="text-align: right; font-weight: bold; color: #059669;">${ui.formatRupiah(bill.totalAmount)}</td></tr><tr><td style="font-size: 12px; color: #666; padding-top: 5px;">Metode Bayar</td><td style="text-align: right; font-size: 12px; color: #666; padding-top: 5px; font-weight:bold;">${bill.paymentMethod}</td></tr></table></div><div style="text-align: center; margin-top: 30px; font-size: 12px; color: #888;"><p>Terima kasih atas kunjungan Anda.<br>Semoga lekas sembuh!</p></div></div>`;
+                        window.print();
+                    }
+                },
+                users: {
+                    render: () => {
+                        const tbody = document.querySelector('#table-users tbody');
+                        if(tbody) tbody.innerHTML = state.data.users.map(u => `<tr><td class="font-bold">${u.username}</td><td>${u.profile?.nama||'-'}</td><td><span class="px-2 py-1 bg-slate-100 rounded text-xs">${u.role}</span></td><td>${u.isActive ? '<span class="text-emerald-500">Aktif</span>' : '<span class="text-red-500">Nonaktif</span>'}</td></tr>`).join('');
+                    },
+                    save: async (e) => {
+                        e.preventDefault(); ui.showLoading();
+                        await addDoc(getCol('users'), { username: document.getElementById('usr-uname').value, password: document.getElementById('usr-pass').value, role: document.getElementById('usr-role').value, profile: { nama: document.getElementById('usr-nama').value }, isActive: true });
+                        ui.closeModal('modal-user'); e.target.reset(); ui.toast("Staf berhasil ditambahkan!"); ui.hideLoading();
+                    }
+                }
+            }
+        };
+
+        window.app = app; window.ui = ui;
+        document.addEventListener('DOMContentLoaded', app.init);
+    </script>
+</body>
+</html>
