@@ -445,7 +445,14 @@
         import { getAuth, signInAnonymously, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, getDocs, onSnapshot, query, where, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        let firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "DEMO_KEY", authDomain: "demo.firebaseapp.com", projectId: "demo" };
+        const firebaseConfig = {
+          apiKey: "AIzaSyA4uULeDDA1tVjp7T47VKYt-zjOFl-sAs0",
+          authDomain: "sistem-klinik-1498b.firebaseapp.com",
+          projectId: "sistem-klinik-1498b",
+          storageBucket: "sistem-klinik-1498b.firebasestorage.app",
+          messagingSenderId: "1046149478208",
+          appId: "1:1046149478208:web:6d01d4259cb005789deca5"
+        };
         const fbApp = initializeApp(firebaseConfig);
         const auth = getAuth(fbApp);
         const db = getFirestore(fbApp);
